@@ -1,3 +1,5 @@
+<img width="1920" height="1440" alt="295shots_so" src="https://github.com/user-attachments/assets/bc8e08cc-5e91-4afe-8c1d-42f53e0e2b5b" />
+
 # Retro Asteroid Shooter
 
 A fast, fullscreen, top‑down asteroid shooter built with HTML5 Canvas and vanilla JavaScript. Minimalist retro visuals, tight controls, smart spawning (no unfair bottom spawns), asteroid collisions, and auto performance tuning keep gameplay smooth.
