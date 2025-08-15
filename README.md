@@ -4,6 +4,19 @@
 
 A fast, fullscreen, top‑down asteroid shooter built with HTML5 Canvas and vanilla JavaScript. Minimalist retro visuals, tight controls, smart spawning (no unfair bottom spawns), asteroid collisions, and auto performance tuning keep gameplay smooth.
 
+## Quick Feature Checklist
+
+- ✅ Fullscreen canvas
+- ✅ Smooth WASD/Arrow movement + Space to shoot
+- ✅ Fair spawns (top/left/right only; never bottom)
+- ✅ Asteroid colors: grey/black/white/whitish/transparent + black borders
+- ✅ Procedural shapes with rotation
+- ✅ Break into smaller pieces (capped)
+- ✅ Asteroid↔asteroid collision bounce
+- ✅ Camera shake on big impacts
+- ✅ Auto performance mode (FPS-aware)
+- ✅ Minimal setup (open `index.html` and play)
+
 ## Features
 
 - **Fullscreen canvas**: Scales to your window; UI is fixed and readable
