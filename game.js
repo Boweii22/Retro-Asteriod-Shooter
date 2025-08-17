@@ -266,7 +266,7 @@ class Player {
         this.y = height - 100;
         this.width = 40;
         this.height = 60;
-        this.speed = 10;
+        this.speed = 13;
         this.health = 100;
         this.lastShot = 0;
         this.shotCooldown = 200;
@@ -346,19 +346,33 @@ class Player {
         
         // Charge shot system
         if (keys[' '] && this.chargeShotAvailable) {
-            this.chargeShotLevel = Math.min(3, this.chargeShotLevel + 0.1);
+            try {
+                this.chargeShotLevel = Math.min(3, this.chargeShotLevel + 0.1);
+            } catch (error) {
+                console.error('Error in charge shot logic:', error);
+                this.chargeShotLevel = 0;
+            }
         } else if (this.chargeShotLevel > 0) {
             // Fire charge shot when space is released
-            if (this.chargeShotLevel >= 1) {
-                this.fireChargeShot();
+            try {
+                if (this.chargeShotLevel >= 1) {
+                    this.fireChargeShot();
+                }
+            } catch (error) {
+                console.error('Error firing charge shot:', error);
+            } finally {
+                this.chargeShotLevel = 0;
             }
-            this.chargeShotLevel = 0;
         }
         
         // Homing missile system
         if (keys['h'] && this.homingMissiles > 0 && now - this.lastHomingShot > 500) {
-            this.fireHomingMissile();
-            this.lastHomingShot = now;
+            try {
+                this.fireHomingMissile();
+                this.lastHomingShot = now;
+            } catch (error) {
+                console.error('Error firing homing missile:', error);
+            }
         }
         
         this.engineGlow += 0.1;
@@ -400,12 +414,16 @@ class Player {
             
             for (let i = 0; i < totalProjectiles; i++) {
                 const vx = startX + (i * spacing);
-                const proj = projectilePool.get();
-                proj.init(this.x + vx, this.y - this.height/2, vx * 0.3, -10, '#535353');
+                if (projectilePool && projectilePool.get) {
+                    const proj = projectilePool.get();
+                    proj.init(this.x + vx, this.y - this.height/2, vx * 0.3, -10, '#535353');
+                }
             }
         } else {
-            const proj = projectilePool.get();
-            proj.init(this.x, this.y - this.height/2, 0, -10, '#535353');
+            if (projectilePool && projectilePool.get) {
+                const proj = projectilePool.get();
+                proj.init(this.x, this.y - this.height/2, 0, -10, '#535353');
+            }
         }
     }
 
@@ -505,53 +523,46 @@ class Player {
 
     fireChargeShot() {
         if (!this.chargeShotAvailable) return;
-        
+
         const chargeLevel = Math.min(3, this.chargeShotLevel);
         const damage = 50 + (chargeLevel * 25);
         const width = 8 + (chargeLevel * 4);
         const length = 100 + (chargeLevel * 50);
-        
-        console.log(`Firing charge shot! Level: ${chargeLevel.toFixed(1)}, Damage: ${damage}`);
-        
-        // Create piercing beam projectile
-        const chargeProj = new ChargeProjectile();
-        chargeProj.init(this.x, this.y - this.height/2, 0, -15, '#00ffff', damage, width, length, chargeLevel);
-        projectilePool.active.push(chargeProj);
-        
-        // Visual and audio effects
+
+        // Use chargeProjectilePool
+        if (chargeProjectilePool && chargeProjectilePool.get) {
+            const chargeProj = chargeProjectilePool.get();
+            chargeProj.init(this.x, this.y - this.height/2, 0, -15, '#00ffff', damage, width, length, chargeLevel);
+        }
+
         createExplosion(this.x, this.y - this.height/2, '#00ffff', 20);
         addCameraShake(chargeLevel * 2);
-        
-        // Cooldown
         this.chargeShotCooldown = Date.now() + 2000;
     }
     
     fireHomingMissile() {
         if (this.homingMissiles <= 0) return;
-        
         this.homingMissiles--;
-        console.log(`Firing homing missile! Ammo remaining: ${this.homingMissiles}`);
-        
-        // Find nearest target
+
         let nearestTarget = null;
         let nearestDistance = Infinity;
-        
-        asteroids.forEach(asteroid => {
-            const dx = asteroid.x - this.x;
-            const dy = asteroid.y - this.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestTarget = asteroid;
-            }
-        });
-        
-        if (nearestTarget) {
-            const homingMissile = new HomingMissile();
+        if (asteroids && asteroids.length > 0) {
+            asteroids.forEach(asteroid => {
+                if (asteroid && asteroid.health > 0) {
+                    const dx = asteroid.x - this.x;
+                    const dy = asteroid.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestTarget = asteroid;
+                    }
+                }
+            });
+        }
+
+        if (nearestTarget && homingMissilePool && homingMissilePool.get) {
+            const homingMissile = homingMissilePool.get();
             homingMissile.init(this.x, this.y - this.height/2, nearestTarget);
-            projectilePool.active.push(homingMissile);
-            
-            // Visual effect
             createExplosion(this.x, this.y - this.height/2, '#ff00ff', 15);
         }
     }
@@ -627,6 +638,7 @@ class ChargeProjectile {
         this.chargeLevel = 1;
         this.life = 120;
         this.piercedTargets = [];
+        this.isPiercing = true;
     }
     
     init(x, y, vx, vy, color, damage, width, length, chargeLevel) {
@@ -641,6 +653,7 @@ class ChargeProjectile {
         this.chargeLevel = chargeLevel;
         this.life = 120;
         this.piercedTargets = [];
+        this.isPiercing = true;
     }
 
     update() {
@@ -656,21 +669,22 @@ class ChargeProjectile {
     draw() {
         ctx.save();
         
-        // Beam trail effect
-        const trailLength = this.length * 0.3;
-        for (let i = 0; i < 3; i++) {
-            const alpha = 0.3 - (i * 0.1);
-            const offset = i * 2;
+        // Draw beam trail effect (multiple layers for glow)
+        for (let i = 0; i < 5; i++) {
+            const alpha = 0.8 - (i * 0.15);
+            const offset = i * 1.5;
+            const trailWidth = this.width + (i * 2);
+            
             ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
             ctx.fillRect(
-                this.x - this.width/2 + offset, 
+                this.x - trailWidth/2, 
                 this.y - this.length/2, 
-                this.width - (offset * 2), 
+                trailWidth, 
                 this.length
             );
         }
         
-        // Main beam
+        // Main beam core
         ctx.fillStyle = this.color;
         ctx.fillRect(
             this.x - this.width/2, 
@@ -679,21 +693,21 @@ class ChargeProjectile {
             this.length
         );
         
-        // Beam glow effect
-        ctx.shadowColor = this.color;
-        ctx.shadowBlur = 10;
+        // Bright center line
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(
-            this.x - this.width/2, 
+            this.x - 2, 
             this.y - this.length/2, 
-            this.width, 
+            4, 
             this.length
         );
         
-        // Charge level indicator
+        // Charge level indicator at beam tip
         ctx.fillStyle = '#ffffff';
-        ctx.font = '12px Courier New';
+        ctx.font = 'bold 14px Courier New';
         ctx.textAlign = 'center';
-        ctx.fillText(`L${this.chargeLevel.toFixed(0)}`, this.x, this.y);
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`L${this.chargeLevel.toFixed(0)}`, this.x, this.y - this.length/2 - 15);
         
         ctx.restore();
     }
@@ -706,6 +720,16 @@ class ChargeProjectile {
     // Add target to pierced list
     addPiercedTarget(targetId) {
         this.piercedTargets.push(targetId);
+    }
+    
+    // Get collision bounds for piercing detection
+    getCollisionBounds() {
+        return {
+            x: this.x - this.width/2,
+            y: this.y - this.length/2,
+            width: this.width,
+            height: this.length
+        };
     }
 }
 
@@ -723,8 +747,9 @@ class HomingMissile {
         this.speed = 8;
         this.target = null;
         this.life = 150;
-        this.turnRate = 0.1;
+        this.turnRate = 0.15;
         this.trail = [];
+        this.engineGlow = 0;
     }
     
     init(x, y, target) {
@@ -735,12 +760,13 @@ class HomingMissile {
         this.vy = -this.speed;
         this.life = 150;
         this.trail = [];
+        this.engineGlow = 0;
     }
 
     update() {
         // Update trail
         this.trail.push({ x: this.x, y: this.y });
-        if (this.trail.length > 10) {
+        if (this.trail.length > 15) {
             this.trail.shift();
         }
         
@@ -754,14 +780,16 @@ class HomingMissile {
                 const targetVx = (dx / distance) * this.speed;
                 const targetVy = (dy / distance) * this.speed;
                 
-                // Gradually turn towards target
+                // Gradually turn towards target with improved tracking
                 this.vx += (targetVx - this.vx) * this.turnRate;
                 this.vy += (targetVy - this.vy) * this.turnRate;
                 
-                // Normalize velocity
+                // Normalize velocity to maintain speed
                 const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-                this.vx = (this.vx / speed) * this.speed;
-                this.vy = (this.vy / speed) * this.speed;
+                if (speed > 0) {
+                    this.vx = (this.vx / speed) * this.speed;
+                    this.vy = (this.vy / speed) * this.speed;
+                }
             }
         }
         
@@ -769,6 +797,7 @@ class HomingMissile {
         this.x += this.vx;
         this.y += this.vy;
         this.life--;
+        this.engineGlow += 0.3;
     }
     
     shouldRemove() {
@@ -778,35 +807,54 @@ class HomingMissile {
     draw() {
         ctx.save();
         
-        // Draw trail
+        // Draw missile trail with fade effect
         this.trail.forEach((pos, index) => {
-            const alpha = (index / this.trail.length) * 0.6;
+            const alpha = (index / this.trail.length) * 0.8;
+            const size = 3 - (index * 0.1);
             ctx.fillStyle = `rgba(255, 0, 255, ${alpha})`;
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
+            ctx.arc(pos.x, pos.y, Math.max(1, size), 0, Math.PI * 2);
             ctx.fill();
         });
         
-        // Draw missile body
+        // Draw missile body (elongated oval shape)
         ctx.fillStyle = '#ff00ff';
         ctx.beginPath();
-        ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+        ctx.ellipse(this.x, this.y, 6, 3, Math.atan2(this.vy, this.vx), 0, Math.PI * 2);
         ctx.fill();
         
-        // Missile glow
-        ctx.shadowColor = '#ff00ff';
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Direction indicator
+        // Missile outline
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + this.vx * 2, this.y + this.vy * 2);
+        ctx.ellipse(this.x, this.y, 6, 3, Math.atan2(this.vy, this.vx), 0, Math.PI * 2);
         ctx.stroke();
+        
+        // Engine glow effect
+        const glowIntensity = 0.5 + 0.5 * Math.sin(this.engineGlow);
+        ctx.fillStyle = `rgba(255, 255, 0, ${glowIntensity})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Direction indicator (nose cone)
+        const angle = Math.atan2(this.vy, this.vx);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(
+            this.x + Math.cos(angle) * 8,
+            this.y + Math.sin(angle) * 8
+        );
+        ctx.lineTo(
+            this.x + Math.cos(angle + 0.3) * 4,
+            this.y + Math.sin(angle + 0.3) * 4
+        );
+        ctx.lineTo(
+            this.x + Math.cos(angle - 0.3) * 4,
+            this.y + Math.sin(angle - 0.3) * 4
+        );
+        ctx.closePath();
+        ctx.fill();
         
         ctx.restore();
     }
@@ -1148,6 +1196,8 @@ let powerUps = [];
 
 // Object pools
 let projectilePool;
+let chargeProjectilePool; // NEW: Separate pool for charge shots
+let homingMissilePool;    // NEW: Separate pool for homing missiles
 let particlePool;
 let powerUpPool;
 
@@ -1155,20 +1205,28 @@ let powerUpPool;
 function initGame() {
     // Create player
     player = new Player();
-    
+
     // Initialize object pools
     projectilePool = new ObjectPool(
         () => new Projectile(),
         (proj) => proj.reset(),
         gameState.maxProjectiles
     );
-    
+    chargeProjectilePool = new ObjectPool(
+        () => new ChargeProjectile(),
+        (proj) => proj.reset(),
+        5
+    );
+    homingMissilePool = new ObjectPool(
+        () => new HomingMissile(),
+        (proj) => proj.reset(),
+        10
+    );
     particlePool = new ObjectPool(
         () => new Particle(),
         (particle) => particle.reset(),
         gameState.maxParticles
     );
-    
     powerUpPool = new ObjectPool(
         () => new PowerUp(),
         (pu) => pu.reset(),
@@ -1277,6 +1335,8 @@ function update() {
     
     // Update object pools
     projectilePool.update();
+    chargeProjectilePool.update();
+    homingMissilePool.update();
     particlePool.update();
     powerUpPool.update();
     
@@ -1413,17 +1473,25 @@ function update() {
                 createExplosion(player.x, player.y, '#00cc66', 20);
             }
             if (pu.type === 'charge') {
-                player.chargeShotAvailable = true;
-                player.chargeShotLevel = 0;
-                console.log('Charge shot power-up activated!');
-                // Show charge shot activation effect
-                createExplosion(player.x, player.y, '#00ffff', 25);
+                try {
+                    player.chargeShotAvailable = true;
+                    player.chargeShotLevel = 0;
+                    console.log('Charge shot power-up activated!');
+                    // Show charge shot activation effect
+                    createExplosion(player.x, player.y, '#00ffff', 25);
+                } catch (error) {
+                    console.error('Error activating charge shot:', error);
+                }
             }
             if (pu.type === 'homing') {
-                player.homingMissiles += 5; // Add 5 homing missiles
-                console.log(`Homing missiles added! Total: ${player.homingMissiles}`);
-                // Show homing missile activation effect
-                createExplosion(player.x, player.y, '#ff00ff', 25);
+                try {
+                    player.homingMissiles += 5; // Add 5 homing missiles
+                    console.log(`Homing missiles added! Total: ${player.homingMissiles}`);
+                    // Show homing missile activation effect
+                    createExplosion(player.x, player.y, '#ff00ff', 25);
+                } catch (error) {
+                    console.error('Error activating homing missiles:', error);
+                }
             }
             
             // Mark power-up as collected
@@ -1439,19 +1507,15 @@ function update() {
     }
     
     // Collision detection: projectiles vs asteroids
-    projectilePool.active.forEach((proj, projIndex) => {
+    projectilePool.active.forEach((proj) => {
         for (let i = asteroids.length - 1; i >= 0; i--) {
             const asteroid = asteroids[i];
             if (checkCollision(
                 {x: proj.x - proj.width/2, y: proj.y - proj.height/2, width: proj.width, height: proj.height},
                 {x: asteroid.x - asteroid.size, y: asteroid.y - asteroid.size, width: asteroid.size * 2, height: asteroid.size * 2}
             )) {
-                // Remove projectile
                 projectilePool.release(proj);
-                
-                // Damage asteroid
                 if (asteroid.takeDamage(25)) {
-                    // Asteroid destroyed
                     createExplosion(asteroid.x, asteroid.y, asteroid.getColor(), 30);
                     gameState.score += asteroid.size * 10;
                     addCameraShake(asteroid.size / 10);
@@ -1487,7 +1551,108 @@ function update() {
                     // Remove destroyed asteroid
                     asteroids.splice(i, 1);
                 }
-                break; // Exit asteroid loop since projectile is destroyed
+                break;
+            }
+        }
+    });
+    
+    // Handle charge projectiles
+    chargeProjectilePool.active.forEach((proj) => {
+        for (let i = asteroids.length - 1; i >= 0; i--) {
+            const asteroid = asteroids[i];
+            if (proj.isPiercing && proj.hasHitTarget && proj.hasHitTarget(i)) continue;
+            if (checkCollision(
+                {x: proj.x - proj.width/2, y: proj.y - proj.length/2, width: proj.width, height: proj.length},
+                {x: asteroid.x - asteroid.size, y: asteroid.y - asteroid.size, width: asteroid.size * 2, height: asteroid.size * 2}
+            )) {
+                if (proj.addPiercedTarget) proj.addPiercedTarget(i);
+                if (asteroid.takeDamage(proj.damage || 25)) {
+                    createExplosion(asteroid.x, asteroid.y, asteroid.getColor(), 30);
+                    gameState.score += asteroid.size * 10;
+                    addCameraShake(asteroid.size / 10);
+                    
+                    // Chance to drop a power-up
+                    if (Math.random() < 0.15) {
+                        const kinds = ['shield', 'dash', 'spread', 'charge', 'homing'];
+                        const kind = kinds[Math.floor(Math.random() * kinds.length)];
+                        const pu = powerUpPool.get();
+                        pu.init(asteroid.x, asteroid.y, kind);
+                        powerUps.push(pu);
+                    }
+                    
+                    // Spawn smaller asteroids
+                    if (asteroid.size > 30 && asteroids.length < gameState.maxAsteroids - 2) {
+                        for (let j = 0; j < 2; j++) {
+                            let spawnX = asteroid.x + (Math.random() - 0.5) * 20;
+                            let spawnY = asteroid.y + (Math.random() - 0.5) * 20;
+                            if (spawnY > height - 250) { spawnY = height - 250; }
+                            
+                            const smallerAsteroid = new Asteroid();
+                            smallerAsteroid.init(
+                                spawnX,
+                                spawnY,
+                                asteroid.size * 0.6,
+                                asteroid.type
+                            );
+                            smallerAsteroid.hasDivided = true;
+                            asteroids.push(smallerAsteroid);
+                        }
+                    }
+                    
+                    // Remove destroyed asteroid
+                    asteroids.splice(i, 1);
+                }
+                break;
+            }
+        }
+    });
+    
+    // Handle homing missiles
+    homingMissilePool.active.forEach((proj) => {
+        for (let i = asteroids.length - 1; i >= 0; i--) {
+            const asteroid = asteroids[i];
+            if (checkCollision(
+                {x: proj.x - 6, y: proj.y - 6, width: 12, height: 12},
+                {x: asteroid.x - asteroid.size, y: asteroid.y - asteroid.size, width: asteroid.size * 2, height: asteroid.size * 2}
+            )) {
+                homingMissilePool.release(proj);
+                if (asteroid.takeDamage(50)) {
+                    createExplosion(asteroid.x, asteroid.y, asteroid.getColor(), 30);
+                    gameState.score += asteroid.size * 10;
+                    addCameraShake(asteroid.size / 10);
+                    
+                    // Chance to drop a power-up
+                    if (Math.random() < 0.15) {
+                        const kinds = ['shield', 'dash', 'spread', 'charge', 'homing'];
+                        const kind = kinds[Math.floor(Math.random() * kinds.length)];
+                        const pu = powerUpPool.get();
+                        pu.init(asteroid.x, asteroid.y, kind);
+                        powerUps.push(pu);
+                    }
+                    
+                    // Spawn smaller asteroids
+                    if (asteroid.size > 30 && asteroids.length < gameState.maxAsteroids - 2) {
+                        for (let j = 0; j < 2; j++) {
+                            let spawnX = asteroid.x + (Math.random() - 0.5) * 20;
+                            let spawnY = asteroid.y + (Math.random() - 0.5) * 20;
+                            if (spawnY > height - 250) { spawnY = height - 250; }
+                            
+                            const smallerAsteroid = new Asteroid();
+                            smallerAsteroid.init(
+                                spawnX,
+                                spawnY,
+                                asteroid.size * 0.6,
+                                asteroid.type
+                            );
+                            smallerAsteroid.hasDivided = true;
+                            asteroids.push(smallerAsteroid);
+                        }
+                    }
+                    
+                    // Remove destroyed asteroid
+                    asteroids.splice(i, 1);
+                }
+                break;
             }
         }
     });
@@ -1668,30 +1833,34 @@ function updateUI() {
     // Charge shot status
     const chargeShotBar = document.getElementById('chargeShotBar');
     const chargeShotStatus = document.getElementById('chargeShotStatus');
-    if (player.chargeShotAvailable) {
-        if (keys[' '] && player.chargeShotLevel > 0) {
-            // Show charge level
-            const chargePercent = (player.chargeShotLevel / 3) * 100;
-            chargeShotBar.style.width = chargePercent + '%';
-            chargeShotStatus.textContent = `L${player.chargeShotLevel.toFixed(1)}`;
+    if (chargeShotBar && chargeShotStatus) {
+        if (player.chargeShotAvailable) {
+            if (keys[' '] && player.chargeShotLevel > 0) {
+                // Show charge level
+                const chargePercent = (player.chargeShotLevel / 3) * 100;
+                chargeShotBar.style.width = chargePercent + '%';
+                chargeShotStatus.textContent = `L${player.chargeShotLevel.toFixed(1)}`;
+            } else {
+                chargeShotBar.style.width = '100%';
+                chargeShotStatus.textContent = 'Hold SPACE';
+            }
         } else {
-            chargeShotBar.style.width = '100%';
-            chargeShotStatus.textContent = 'Hold SPACE';
+            chargeShotBar.style.width = '0%';
+            chargeShotStatus.textContent = 'Inactive';
         }
-    } else {
-        chargeShotBar.style.width = '0%';
-        chargeShotStatus.textContent = 'Inactive';
     }
     
     // Homing missile status
     const homingMissileBar = document.getElementById('homingMissileBar');
     const homingMissileStatus = document.getElementById('homingMissileStatus');
-    if (player.homingMissiles > 0) {
-        homingMissileStatus.textContent = player.homingMissiles;
-        homingMissileBar.style.width = '100%';
-    } else {
-        homingMissileStatus.textContent = '0';
-        homingMissileBar.style.width = '0%';
+    if (homingMissileBar && homingMissileStatus) {
+        if (player.homingMissiles > 0) {
+            homingMissileStatus.textContent = player.homingMissiles;
+            homingMissileBar.style.width = '100%';
+        } else {
+            homingMissileStatus.textContent = '0';
+            homingMissileBar.style.width = '0%';
+        }
     }
 }
 
@@ -1728,6 +1897,8 @@ function draw() {
     powerUps.forEach(pu => pu.draw());
     asteroids.forEach(asteroid => asteroid.draw());
     projectilePool.draw();
+    chargeProjectilePool.draw();
+    homingMissilePool.draw();
     
     // Draw player
     if (player) {
@@ -1816,6 +1987,8 @@ function resetGame() {
     
     // Clear object pools
     if (projectilePool) projectilePool.clear();
+    if (chargeProjectilePool) chargeProjectilePool.clear();
+    if (homingMissilePool) homingMissilePool.clear();
     if (particlePool) particlePool.clear();
     if (powerUpPool) powerUpPool.clear();
     
@@ -2018,4 +2191,4 @@ setTimeout(() => {
             }
         }, 1000);
     }
-}, 100); 
+}, 100);
