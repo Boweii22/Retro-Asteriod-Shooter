@@ -5,12 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cosmic Asteroid Shooter</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
             margin: 0;
             padding: 0;
             background: #f7f7f7;
             overflow: hidden;
             font-family: 'Courier New', monospace;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
         }
         
         #gameContainer {
@@ -27,6 +35,8 @@
             background: #f7f7f7;
             width: 100%;
             height: 100%;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
         }
         
         #ui {
@@ -35,6 +45,7 @@
             left: 20px;
             z-index: 100;
             font-family: 'Courier New', monospace;
+            pointer-events: none;
         }
         
         .ui-panel {
@@ -45,6 +56,7 @@
             margin-bottom: 10px;
             box-shadow: 2px 2px 0px #000000;
             position: relative;
+            pointer-events: auto;
         }
         
         .ui-label {
@@ -57,11 +69,12 @@
         }
         
         .ui-value {
-            color: #ffffff;
-            font-size: 24px;
+            color: #535353;
+            font-size: 20px;
             font-weight: bold;
-            text-shadow: 0 0 15px #ffffff;
             margin-left: 10px;
+            transition: transform 0.2s ease;
+            will-change: transform;
         }
         
         .ui-bar {
@@ -79,18 +92,35 @@
             background: #535353;
             transition: width 0.3s ease;
             position: relative;
+            will-change: width;
         }
         
         .ui-bar-fill.lives {
             background: #ff0000;
         }
         
-        .ui-value {
-            color: #535353;
-            font-size: 20px;
-            font-weight: bold;
-            margin-left: 10px;
-            transition: transform 0.2s ease;
+        .ui-bar-fill.shield {
+            background: #0066cc;
+        }
+        
+        .ui-bar-fill.dash {
+            background: #00cc66;
+        }
+        
+        .ui-bar-fill.spread {
+            background: #cc66cc;
+        }
+        
+        .ui-bar-fill.explosion {
+            background: #ff6600;
+        }
+        
+        .ui-bar-fill.charge {
+            background: #00ffff;
+        }
+        
+        .ui-bar-fill.homing {
+            background: #ff00ff;
         }
         
         #gameOver {
@@ -101,6 +131,7 @@
             z-index: 200;
             text-align: center;
             display: none;
+            pointer-events: auto;
         }
         
         .game-over-panel {
@@ -132,6 +163,7 @@
             bottom: 20px;
             left: 20px;
             z-index: 100;
+            pointer-events: none;
         }
         
         .controls-panel {
@@ -140,6 +172,7 @@
             border-radius: 0;
             padding: 10px 15px;
             box-shadow: 2px 2px 0px #000000;
+            pointer-events: auto;
         }
         
         .controls-title {
@@ -168,15 +201,89 @@
             font-weight: bold;
             color: #535353;
         }
+        
+        #pauseScreen {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 200;
+            text-align: center;
+            pointer-events: auto;
+        }
+        
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #f7f7f7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 300;
+            font-family: 'Courier New', monospace;
+            color: #535353;
+        }
+        
+        .loading-text {
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        @media (max-width: 768px) {
+            #ui {
+                top: 10px;
+                left: 10px;
+            }
+            
+            #instructions {
+                bottom: 10px;
+                left: 10px;
+            }
+            
+            .ui-panel {
+                padding: 8px 12px;
+                margin-bottom: 8px;
+            }
+            
+            .ui-value {
+                font-size: 16px;
+            }
+            
+            .ui-label {
+                font-size: 10px;
+            }
+        }
+        
+        @keyframes pulse {
+            from {
+                transform: scale(1);
+            }
+            to {
+                transform: scale(1.1);
+            }
+        }
     </style>
 </head>
 <body>
+    <div id="loadingScreen">
+        <div class="loading-text">Loading...</div>
+    </div>
+    
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
         <div id="ui">
             <div class="ui-panel">
-                <div class="ui-label">Score</div>
+                <div class="ui-label">Current Score</div>
                 <div class="ui-value" id="score">0</div>
+            </div>
+            <div class="ui-panel">
+                <div class="ui-label">High Score</div>
+                <div class="ui-value" id="currentHighScore">0</div>
             </div>
             <div class="ui-panel">
                 <div class="ui-label">Lives</div>
@@ -192,31 +299,128 @@
                     <div class="ui-bar-fill" id="levelBar" style="width: 0%"></div>
                 </div>
             </div>
+            <div class="ui-panel">
+                <div class="ui-label">Shield</div>
+                <div class="ui-value" id="shieldStatus">Inactive</div>
+                <div class="ui-bar">
+                    <div class="ui-bar-fill shield" id="shieldBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="ui-panel">
+                <div class="ui-label">Dash</div>
+                <div class="ui-value" id="dashStatus">Inactive</div>
+                <div class="ui-bar">
+                    <div class="ui-bar-fill dash" id="dashBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="ui-panel">
+                <div class="ui-label">Spread</div>
+                <div class="ui-value" id="spreadStatus">Inactive</div>
+                <div class="ui-bar">
+                    <div class="ui-bar-fill spread" id="spreadBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="ui-panel">
+                <div class="ui-label">Explosion</div>
+                <div class="ui-value" id="explosionStatus">Inactive</div>
+                <div class="ui-bar">
+                    <div class="ui-bar-fill explosion" id="explosionBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="ui-panel">
+                <div class="ui-label">Charge Shot</div>
+                <div class="ui-value" id="chargeShotStatus">Inactive</div>
+                <div class="ui-bar">
+                    <div class="ui-bar-fill charge" id="chargeShotBar" style="width: 0%"></div>
+                </div>
+            </div>
+            <div class="ui-panel">
+                <div class="ui-label">Homing Missiles</div>
+                <div class="ui-value" id="homingMissileStatus">0</div>
+                <div class="ui-bar">
+                    <div class="ui-bar-fill homing" id="homingMissileBar" style="width: 0%"></div>
+                </div>
+            </div>
         </div>
+        
         <div id="gameOver">
             <div class="game-over-panel">
                 <div class="game-over-title">Game Over</div>
-                <div class="game-over-subtitle">Press <span class="key">SPACE</span> to restart</div>
+                <div class="game-over-subtitle">
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 18px; margin-bottom: 5px;">This Game Score:</div>
+                        <div id="finalScore" style="font-size: 24px; font-weight: bold; color: #ff6600;">0</div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 14px; margin-bottom: 5px;">All-Time High Score:</div>
+                        <div id="highScore" style="font-size: 20px; font-weight: bold; color: #0066cc;">0</div>
+                    </div>
+                    <div id="newHighScore" style="font-size: 16px; font-weight: bold; margin-bottom: 20px;"></div>
+                    <div>Press <span class="key">SPACE</span> to restart</div>
+                </div>
             </div>
         </div>
+        
         <div id="instructions">
             <div class="controls-panel">
                 <div class="controls-title">Controls</div>
                 <div class="controls-list">
                     <div><span class="key">WASD</span> or <span class="key">Arrow Keys</span>: Move</div>
-                    <div><span class="key">SPACE</span>: Shoot</div>
+                    <div><span class="key">SPACE</span>: Shoot / Hold for Charge Shot</div>
+                    <div><span class="key">H</span>: Fire Homing Missile</div>
+                    <div><span class="key">SHIFT</span>: Dash (when power-up active)</div>
+                    <div><span class="key">Q</span>: Explosion Power (every 7000 score)</div>
                     <div><span class="key">ESC</span>: Pause</div>
+                </div>
+            </div>
+            
+            <div class="controls-panel" style="margin-top: 10px;">
+                <div class="controls-title">How to Play</div>
+                <div class="controls-list">
+                    <div>• Shoot asteroids to earn points</div>
+                    <div>• Collect power-ups (glowing boxes)</div>
+                    <div>• Avoid asteroids or use shield</div>
+                    <div>• You have 3 lives</div>
+                    <div>• Game over when lives = 0</div>
+                </div>
+            </div>
+            
+            <div class="controls-panel" style="margin-top: 10px;">
+                <div class="controls-title">Testing (Dev)</div>
+                <div class="controls-list">
+                    <div>• <span class="key">CTRL+T</span>: Test high score system</div>
+                    <div>• <span class="key">CTRL+R</span>: Reset high score</div>
                 </div>
             </div>
         </div>
         
-        <div id="pauseScreen" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 200;">
+        <div id="pauseScreen">
             <div class="game-over-panel">
                 <div class="game-over-title">Paused</div>
                 <div class="game-over-subtitle">Press <span class="key">ESC</span> to resume</div>
             </div>
         </div>
     </div>
+    
+    <script>
+        // Error handling and loading management
+        window.addEventListener('error', function(e) {
+            console.error('Game error:', e.error);
+            document.getElementById('loadingScreen').innerHTML = 
+                '<div class="loading-text">Game Error: ' + e.error.message + '<br><br>Refresh to retry</div>';
+        });
+        
+        window.addEventListener('load', function() {
+            // Hide loading screen after a short delay to ensure game is ready
+            setTimeout(() => {
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                }
+            }, 500);
+        });
+    </script>
+    
     <script src="game.js"></script>
 </body>
 </html> 
