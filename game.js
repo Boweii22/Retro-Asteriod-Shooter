@@ -429,7 +429,7 @@ class Player {
 
     draw() {
         ctx.save();
-        
+
         // Shield visual
         if (this.shieldHp > 0) {
             const shieldAlpha = Math.min(0.4, 0.2 + this.shieldHp / this.shieldMaxHp * 0.2);
@@ -485,39 +485,48 @@ class Player {
                 ctx.restore();
             }
         }
+        // // Ship body
+        // ctx.fillStyle = '#535353';
         
-        // Ship body
-        ctx.fillStyle = '#535353';
+        // // Flash red when shield is low (danger warning)
+        // if (this.shieldHp > 0 && this.shieldHp < this.shieldMaxHp * 0.3) {
+        //     const dangerFlash = 0.5 + 0.5 * Math.sin(Date.now() * 0.02);
+        //     ctx.fillStyle = `rgba(255, ${255 * (1 - dangerFlash)}, ${255 * (1 - dangerFlash)}, 0.8)`;
+        // }
         
-        // Flash red when shield is low (danger warning)
-        if (this.shieldHp > 0 && this.shieldHp < this.shieldMaxHp * 0.3) {
-            const dangerFlash = 0.5 + 0.5 * Math.sin(Date.now() * 0.02);
-            ctx.fillStyle = `rgba(255, ${255 * (1 - dangerFlash)}, ${255 * (1 - dangerFlash)}, 0.8)`;
-        }
+        // ctx.beginPath();
+        // ctx.moveTo(this.x, this.y - this.height/2);
+        // ctx.lineTo(this.x - this.width/2, this.y + this.height/2);
+        // ctx.lineTo(this.x + this.width/2, this.y + this.height/2);
+        // ctx.closePath();
+        // ctx.fill();
         
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y - this.height/2);
-        ctx.lineTo(this.x - this.width/2, this.y + this.height/2);
-        ctx.lineTo(this.x + this.width/2, this.y + this.height/2);
-        ctx.closePath();
-        ctx.fill();
+        // // Ship outline
+        // ctx.strokeStyle = '#000000';
+        // ctx.lineWidth = 2;
+        // ctx.beginPath();
+        // ctx.moveTo(this.x, this.y - this.height/2);
+        // ctx.lineTo(this.x - this.width/2, this.y + this.height/2);
+        // ctx.lineTo(this.x + this.width/2, this.y + this.height/2);
+        // ctx.closePath();
+        // ctx.stroke();
         
-        // Ship outline
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y - this.height/2);
-        ctx.lineTo(this.x - this.width/2, this.y + this.height/2);
-        ctx.lineTo(this.x + this.width/2, this.y + this.height/2);
-        ctx.closePath();
-        ctx.stroke();
+        // // Ship details
+        // ctx.fillStyle = '#000000';
+        // ctx.beginPath();
+        // ctx.arc(this.x, this.y - this.height/4, 3, 0, Math.PI * 2);
+        // ctx.fill();
         
-        // Ship details
-        ctx.fillStyle = '#000000';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y - this.height/4, 3, 0, Math.PI * 2);
-        ctx.fill();
-        
+        // Draw the spaceship image centered at (this.x, this.y)
+        ctx.translate(this.x, this.y);
+        ctx.drawImage(
+            spaceshipImg,
+            -this.width / 2,
+            -this.height / 2,
+            this.width,
+            this.height
+        );
+
         ctx.restore();
     }
 
@@ -2192,3 +2201,6 @@ setTimeout(() => {
         }, 1000);
     }
 }, 100);
+
+const spaceshipImg = new Image();
+spaceshipImg.src = 'assets/spaceship.png'; // Make sure this path matches your file location
