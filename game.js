@@ -425,6 +425,8 @@ class Player {
                 proj.init(this.x, this.y - this.height/2, 0, -10, '#535353');
             }
         }
+        // Play shoot sound
+        if (sfx.shoot) { try { sfx.shoot.currentTime = 0; sfx.shoot.play(); } catch(e){} }
     }
 
     draw() {
@@ -1195,6 +1197,25 @@ class PowerUp {
     }
 }
 
+// --- AUDIO SETUP ---
+// Place your audio files in an 'assets' folder:
+// assets/shoot.wav, assets/hit.wav, assets/explode.wav, assets/bg-music.mp3
+
+const sfx = {
+    shoot: new Audio('assets/shoot.mp3'),
+    hit: new Audio('assets/hit.mp3'),
+    explode: new Audio('assets/explode.mp3')
+};
+const bgMusic = new Audio('assets/bg-music.mp3');
+bgMusic.loop = true;
+bgMusic.volume = 0.25; // Subtle background music
+
+// Start background music when the game starts (user gesture required in most browsers)
+window.addEventListener('keydown', function startMusicOnce() {
+    bgMusic.play().catch(()=>{});
+    window.removeEventListener('keydown', startMusicOnce);
+});
+
 // Game Objects
 let player;
 let asteroids = [];
@@ -1526,6 +1547,7 @@ function update() {
                 projectilePool.release(proj);
                 if (asteroid.takeDamage(25)) {
                     createExplosion(asteroid.x, asteroid.y, asteroid.getColor(), 30);
+                    if (sfx.explode) { try { sfx.explode.currentTime = 0; sfx.explode.play(); } catch(e){} }
                     gameState.score += asteroid.size * 10;
                     addCameraShake(asteroid.size / 10);
                     
@@ -1683,6 +1705,7 @@ function update() {
                 } else {
                     // Player hit
                     createExplosion(player.x, player.y, '#535353', 40);
+                    if (sfx.explode) { try { sfx.explode.currentTime = 0; sfx.explode.play(); } catch(e){} }
                     gameState.lives--;
                     addCameraShake(5);
                     asteroids.splice(i, 1);
