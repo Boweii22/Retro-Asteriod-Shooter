@@ -1,3 +1,5 @@
+const EXPLOSION_POWER_SCORE = 25000;
+
 let sfxEnabled = true;
 let musicEnabled = true;
 
@@ -89,7 +91,7 @@ let gameState = {
     performanceMode: false,
     screenFlash: 0,
     screenFlashColor: '#ff6600',
-    lastExplosionMilestone: 0,
+    explosionPowerUses: 1, // Track how many times explosion power has been used (starts at 1 for first unlock)
     maxAsteroids: 15, // Limit total asteroids
     maxParticles: 200, // Limit total particles
     maxProjectiles: 50, // Limit total projectiles
@@ -160,15 +162,13 @@ const resumeBtn = pauseMenu.querySelector('#resume-btn');
 
 function setSFXEnabled(val) {
     sfxEnabled = val;
-    if (window.sfx) {
-        for (const key in sfx) {
-            if (sfx[key]) sfx[key].muted = !val;
-        }
+    for (const key in sfx) {
+        if (sfx[key]) sfx[key].muted = !val;
     }
 }
 function setMusicEnabled(val) {
     musicEnabled = val;
-    if (window.bgMusic) {
+    if (bgMusic) {
         bgMusic.muted = !val;
         if (val && bgMusic.paused) bgMusic.play().catch(()=>{});
         if (!val && !bgMusic.paused) bgMusic.pause();
@@ -224,6 +224,20 @@ window.addEventListener('keydown', function(e) {
 // if (sfx.shoot && sfxEnabled) { sfx.shoot.currentTime = 0; sfx.shoot.play(); }
 // Example for music:
 // if (musicEnabled && bgMusic.paused) bgMusic.play();
+
+// --- SFX PLAY HELPER ---
+function playSFX(type) {
+    if (!sfxEnabled) return;
+    let src = '';
+    if (type === 'shoot') src = 'assets/shoot.mp3';
+    else if (type === 'hit') src = 'assets/hit.mp3';
+    else if (type === 'explode') src = 'assets/explode.mp3';
+    if (src) {
+        const audio = new Audio(src);
+        audio.volume = 1.0;
+        audio.play();
+    }
+}
 
 // Object Pool for better performance
 class ObjectPool {
@@ -525,11 +539,11 @@ class Player {
 
     triggerExplosionPower() {
         this.explosionPowerAvailable = false;
-        
+        // Increment explosionPowerUses so next unlock is harder
+        gameState.explosionPowerUses = (gameState.explosionPowerUses || 1) + 1;
         // Create massive explosion effect
         createExplosion(this.x, this.y, '#ff6600', 200);
         addCameraShake(25);
-        
         // Destroy ALL asteroids on screen
         for (let i = asteroids.length - 1; i >= 0; i--) {
             const asteroid = asteroids[i];
@@ -537,14 +551,12 @@ class Player {
             gameState.score += asteroid.size * 10;
             asteroids.splice(i, 1);
         }
-        
         gameState.screenFlash = 20;
     }
 
     shoot() {
         const now = Date.now();
         const spreadActive = now < this.spreadShotUntil;
-        
         if (spreadActive) {
             // Get current spread count (default to 1 if not set)
             const spreadCount = this.spreadCount || 1;
@@ -570,6 +582,7 @@ class Player {
                 proj.init(this.x, this.y - this.height/2, 0, -10, '#535353');
             }
         }
+        playSFX('shoot');
     }
 
     draw() {
@@ -1673,6 +1686,7 @@ function update() {
                     createExplosion(asteroid.x, asteroid.y, asteroid.getColor(), 30);
                     gameState.score += asteroid.size * 10;
                     addCameraShake(asteroid.size / 10);
+                    playSFX('explode');
                     
                     // Chance to drop a power-up
                     if (Math.random() < 0.15) {
@@ -1704,6 +1718,9 @@ function update() {
                     
                     // Remove destroyed asteroid
                     asteroids.splice(i, 1);
+                } else {
+                    // Asteroid was hit but not destroyed
+                    playSFX('hit');
                 }
                 break;
             }
@@ -1724,6 +1741,7 @@ function update() {
                     createExplosion(asteroid.x, asteroid.y, asteroid.getColor(), 30);
                     gameState.score += asteroid.size * 10;
                     addCameraShake(asteroid.size / 10);
+                    playSFX('explode');
                     
                     // Chance to drop a power-up
                     if (Math.random() < 0.15) {
@@ -1774,6 +1792,7 @@ function update() {
                     createExplosion(asteroid.x, asteroid.y, asteroid.getColor(), 30);
                     gameState.score += asteroid.size * 10;
                     addCameraShake(asteroid.size / 10);
+                    playSFX('explode');
                     
                     // Chance to drop a power-up
                     if (Math.random() < 0.15) {
@@ -1861,6 +1880,7 @@ function update() {
                         gameState.screenFlashColor = '#ff0000'; // Red for death
                     }
                 }
+                playSFX('hit');
             }
         }
     }
@@ -1878,11 +1898,8 @@ function update() {
         gameState.level++;
         spawnAsteroids();
     }
-
-    // Grant explosion power every 7000 points
-    const currentMilestone = Math.floor(gameState.score / 7000) * 7000;
-    if (currentMilestone > gameState.lastExplosionMilestone && !player.explosionPowerAvailable) {
-        gameState.lastExplosionMilestone = currentMilestone;
+    // Grant explosion power only when score >= EXPLOSION_POWER_SCORE * explosionPowerUses
+    if (!player.explosionPowerAvailable && gameState.score >= EXPLOSION_POWER_SCORE * gameState.explosionPowerUses) {
         player.explosionPowerAvailable = true;
     }
 }
@@ -2018,6 +2035,78 @@ function updateUI() {
     }
 }
 
+// --- HELP PANEL ---
+(function(){
+    // Remove existing controls/how-to-play cards if present
+    const controlsCard = document.getElementById('controls-card');
+    if (controlsCard) controlsCard.remove();
+    const howToPlayCard = document.getElementById('howtoplay-card');
+    if (howToPlayCard) howToPlayCard.remove();
+
+    // Create help button
+    const helpBtn = document.createElement('button');
+    helpBtn.textContent = '?';
+    helpBtn.title = 'Show Controls & How to Play';
+    helpBtn.style.position = 'fixed';
+    helpBtn.style.top = '18px';
+    helpBtn.style.right = '18px';
+    helpBtn.style.width = '36px';
+    helpBtn.style.height = '36px';
+    helpBtn.style.borderRadius = '50%';
+    helpBtn.style.background = '#fff';
+    helpBtn.style.color = '#222';
+    helpBtn.style.fontWeight = 'bold';
+    helpBtn.style.fontSize = '1.5em';
+    helpBtn.style.border = '2px solid #222';
+    helpBtn.style.boxShadow = '0 2px 8px #0002';
+    helpBtn.style.cursor = 'pointer';
+    helpBtn.style.zIndex = '2001';
+    document.body.appendChild(helpBtn);
+
+    // Create modal
+    const helpModal = document.createElement('div');
+    helpModal.style.position = 'fixed';
+    helpModal.style.top = '0';
+    helpModal.style.left = '0';
+    helpModal.style.width = '100vw';
+    helpModal.style.height = '100vh';
+    helpModal.style.background = 'rgba(0,0,0,0.85)';
+    helpModal.style.display = 'none';
+    helpModal.style.justifyContent = 'center';
+    helpModal.style.alignItems = 'center';
+    helpModal.style.zIndex = '2002';
+    helpModal.innerHTML = `
+        <div style="background:#fff;border-radius:12px;padding:32px 32px;box-shadow:0 4px 24px #0006;min-width:320px;max-width:90vw;max-height:90vh;overflow:auto;position:relative;">
+            <button id="close-help-modal" style="position:absolute;top:12px;right:12px;font-size:1.2em;background:none;border:none;color:#222;cursor:pointer;font-weight:bold;">&times;</button>
+            <h2 style="color:#111;margin-bottom:0.5em;font-family:sans-serif;">CONTROLS</h2>
+            <div style="margin-bottom:1.5em;font-size:1.1em;color:#222;">
+                <b>WASD</b> or <b>Arrow Keys</b>: Move<br>
+                <b>SPACE</b>: Shoot / Hold for Charge Shot<br>
+                <b>H</b>: Fire Homing Missile<br>
+                <b>SHIFT</b>: Dash (when power-up active)<br>
+                <b>Q</b>: Explosion Power (every ${EXPLOSION_POWER_SCORE.toLocaleString()} score)<br>
+                <b>ESC</b>: Pause
+            </div>
+            <h2 style="color:#111;margin-bottom:0.5em;font-family:sans-serif;">HOW TO PLAY</h2>
+            <ul style="color:#222;font-size:1.1em;">
+                <li>Shoot asteroids to earn points</li>
+                <li>Collect power-ups (glowing boxes)</li>
+                <li>Avoid asteroids or use shield</li>
+                <li>You have 3 lives</li>
+                <li>Game over when lives = 0</li>
+            </ul>
+            <h2 style="color:#111;margin-bottom:0.5em;font-family:sans-serif;">TESTING (DEV)</h2>
+            <ul style="color:#222;font-size:1.1em;">
+                <li><b>CTRL+T</b>: Test high score system</li>
+                <li><b>CTRL+R</b>: Reset high score</li>
+            </ul>
+        </div>
+    `;
+    document.body.appendChild(helpModal);
+    helpBtn.onclick = () => { helpModal.style.display = 'flex'; };
+    helpModal.querySelector('#close-help-modal').onclick = () => { helpModal.style.display = 'none'; };
+})();
+
 // Draw game
 function draw() {
     // Clear canvas
@@ -2128,7 +2217,7 @@ function resetGame() {
         performanceMode: false,
         screenFlash: 0,
         screenFlashColor: '#ff6600',
-        lastExplosionMilestone: 0,
+        explosionPowerUses: 1, // Reset explosion power uses
         maxAsteroids: 15,
         maxParticles: 200,
         maxProjectiles: 50,
@@ -2349,3 +2438,29 @@ setTimeout(() => {
 
 const spaceshipImg = new Image();
 spaceshipImg.src = 'assets/spaceship.png'; // Make sure this path matches your file location
+
+// --- SFX DEBUG BUTTON ---
+(function(){
+    const debugDiv = document.createElement('div');
+    debugDiv.style.position = 'fixed';
+    debugDiv.style.bottom = '16px';
+    debugDiv.style.right = '16px';
+    debugDiv.style.background = '#fff';
+    debugDiv.style.border = '2px solid #222';
+    debugDiv.style.borderRadius = '8px';
+    debugDiv.style.padding = '8px 12px';
+    debugDiv.style.zIndex = '2000';
+    debugDiv.style.fontFamily = 'sans-serif';
+    debugDiv.style.fontSize = '1em';
+    debugDiv.style.boxShadow = '0 2px 8px #0002';
+    debugDiv.innerHTML = `
+        <b>SFX Test:</b>
+        <button id="test-shoot">Shoot</button>
+        <button id="test-hit">Hit</button>
+        <button id="test-explode">Explode</button>
+    `;
+    document.body.appendChild(debugDiv);
+    debugDiv.querySelector('#test-shoot').onclick = () => { if(sfx.shoot) { sfx.shoot.currentTime=0; sfx.shoot.play(); } };
+    debugDiv.querySelector('#test-hit').onclick = () => { if(sfx.hit) { sfx.hit.currentTime=0; sfx.hit.play(); } };
+    debugDiv.querySelector('#test-explode').onclick = () => { if(sfx.explode) { sfx.explode.currentTime=0; sfx.explode.play(); } };
+})();

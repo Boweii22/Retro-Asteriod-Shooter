@@ -49,30 +49,32 @@
         }
         
         .ui-panel {
-            background: #ffffff;
+            background: rgba(255,255,255,0.7);
             border: 2px solid #535353;
             border-radius: 0;
-            padding: 10px 15px;
-            margin-bottom: 10px;
-            box-shadow: 2px 2px 0px #000000;
+            padding: 5px 8px;
+            margin-bottom: 6px;
+            box-shadow: 1px 1px 0px #000000;
             position: relative;
             pointer-events: auto;
+            min-width: 120px;
+            max-width: 180px;
         }
         
         .ui-label {
             color: #535353;
-            font-size: 12px;
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            margin-bottom: 5px;
+            margin-bottom: 2px;
             font-weight: bold;
         }
         
         .ui-value {
             color: #535353;
-            font-size: 20px;
+            font-size: 14px;
             font-weight: bold;
-            margin-left: 10px;
+            margin-left: 6px;
             transition: transform 0.2s ease;
             will-change: transform;
         }
@@ -361,38 +363,7 @@
             </div>
         </div>
         
-        <div id="instructions">
-            <div class="controls-panel">
-                <div class="controls-title">Controls</div>
-                <div class="controls-list">
-                    <div><span class="key">WASD</span> or <span class="key">Arrow Keys</span>: Move</div>
-                    <div><span class="key">SPACE</span>: Shoot / Hold for Charge Shot</div>
-                    <div><span class="key">H</span>: Fire Homing Missile</div>
-                    <div><span class="key">SHIFT</span>: Dash (when power-up active)</div>
-                    <div><span class="key">Q</span>: Explosion Power (every 7000 score)</div>
-                    <div><span class="key">ESC</span>: Pause</div>
-                </div>
-            </div>
-            
-            <div class="controls-panel" style="margin-top: 10px;">
-                <div class="controls-title">How to Play</div>
-                <div class="controls-list">
-                    <div>• Shoot asteroids to earn points</div>
-                    <div>• Collect power-ups (glowing boxes)</div>
-                    <div>• Avoid asteroids or use shield</div>
-                    <div>• You have 3 lives</div>
-                    <div>• Game over when lives = 0</div>
-                </div>
-            </div>
-            
-            <div class="controls-panel" style="margin-top: 10px;">
-                <div class="controls-title">Testing (Dev)</div>
-                <div class="controls-list">
-                    <div>• <span class="key">CTRL+T</span>: Test high score system</div>
-                    <div>• <span class="key">CTRL+R</span>: Reset high score</div>
-                </div>
-            </div>
-        </div>
+
         
         <div id="pauseScreen">
             <div class="game-over-panel">
