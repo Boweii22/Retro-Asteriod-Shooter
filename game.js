@@ -1,3 +1,51 @@
+let sfxEnabled = true;
+let musicEnabled = true;
+
+// --- AUDIO SETUP ---
+// Place your audio files in an 'assets' folder:
+// assets/shoot.wav, assets/hit.wav, assets/explode.wav, assets/bg-music.mp3
+
+const sfx = {
+    shoot: new Audio('assets/shoot.mp3'),
+    hit: new Audio('assets/hit.mp3'),
+    explode: new Audio('assets/explode.mp3')
+};
+const bgMusic = new Audio('assets/bg-music.mp3');
+bgMusic.loop = true;
+bgMusic.volume = 0.25; // Subtle background music
+
+// Respect toggles on load
+for (const key in sfx) {
+    if (sfx[key]) sfx[key].muted = !sfxEnabled;
+}
+bgMusic.muted = !musicEnabled;
+
+// Start background music on first user gesture
+let musicStarted = false;
+function tryStartMusic() {
+    if (!musicStarted && musicEnabled) {
+        bgMusic.play().catch(()=>{});
+        musicStarted = true;
+    }
+}
+window.addEventListener('keydown', tryStartMusic);
+window.addEventListener('mousedown', tryStartMusic);
+window.addEventListener('touchstart', tryStartMusic);
+
+// Error handling for missing files
+for (const key in sfx) {
+    if (sfx[key]) {
+        sfx[key].addEventListener('error', () => {
+            console.warn('Missing or failed to load SFX:', key);
+        });
+    }
+}
+bgMusic.addEventListener('error', () => {
+    console.warn('Missing or failed to load background music.');
+});
+
+// --- END AUDIO SETUP ---
+
 // Game Canvas Setup
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -55,16 +103,6 @@ document.addEventListener('keydown', (e) => {
     if (e.key === ' ' && gameState.gameOver) {
         resetGame();
     }
-    if (e.key === 'Escape') {
-        gameState.paused = !gameState.paused;
-        const pauseScreen = document.getElementById('pauseScreen');
-        if (gameState.paused) {
-            pauseScreen.style.display = 'block';
-        } else {
-            pauseScreen.style.display = 'none';
-        }
-    }
-    
     // Testing shortcuts (remove in production)
     if (e.key === 't' && e.ctrlKey) {
         e.preventDefault();
@@ -79,6 +117,113 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => {
     keys[e.key.toLowerCase()] = false;
 });
+
+// --- PAUSE MENU UI ---
+let pauseMenu = document.getElementById('pause-menu');
+if (!pauseMenu) {
+    pauseMenu = document.createElement('div');
+    pauseMenu.id = 'pause-menu';
+    pauseMenu.style.position = 'fixed';
+    pauseMenu.style.top = '0';
+    pauseMenu.style.left = '0';
+    pauseMenu.style.width = '100vw';
+    pauseMenu.style.height = '100vh';
+    pauseMenu.style.display = 'none';
+    pauseMenu.style.justifyContent = 'center';
+    pauseMenu.style.alignItems = 'center';
+    pauseMenu.style.background = 'rgba(0,0,0,0.92)';
+    pauseMenu.style.zIndex = '1000';
+    pauseMenu.innerHTML = `
+        <div style="background:#fff;border-radius:12px;padding:36px 36px;box-shadow:0 4px 24px #0006;display:flex;flex-direction:column;align-items:center;min-width:320px;max-width:90vw;border:2px solid #222;">
+            <h2 style="color:#111;font-size:2.1em;margin-bottom:0.5em;letter-spacing:0.04em;font-family:sans-serif;text-shadow:0 1px 0 #fff,0 2px 0 #0002;">PAUSED</h2>
+            <div style="margin-bottom:1.5em;color:#222;font-size:1.1em;text-align:center;">Press <b style='color:#111;'>ESC</b> or <b style='color:#111;'>Resume</b> to continue</div>
+            <div style="margin-bottom:1.2em;width:100%;">
+                <label style="display:flex;align-items:center;justify-content:space-between;font-size:1.1em;margin-bottom:0.7em;">
+                    <span style="color:#111;">Sound Effects</span>
+                    <input type="checkbox" id="sfx-toggle" checked style="transform:scale(1.3);accent-color:#111;">
+                </label>
+                <label style="display:flex;align-items:center;justify-content:space-between;font-size:1.1em;">
+                    <span style="color:#111;">Background Music</span>
+                    <input type="checkbox" id="music-toggle" checked style="transform:scale(1.3);accent-color:#111;">
+                </label>
+            </div>
+            <button id="resume-btn" style="margin-top:1.2em;padding:0.7em 2.2em;font-size:1.1em;background:#222;color:#fff;border:none;border-radius:8px;box-shadow:0 2px 8px #0002;cursor:pointer;transition:background 0.2s;font-family:sans-serif;letter-spacing:0.04em;">Resume</button>
+        </div>
+    `;
+    document.body.appendChild(pauseMenu);
+}
+
+// ...sfxEnabled and musicEnabled are now declared at the top with audio setup...
+const sfxToggle = pauseMenu.querySelector('#sfx-toggle');
+const musicToggle = pauseMenu.querySelector('#music-toggle');
+const resumeBtn = pauseMenu.querySelector('#resume-btn');
+
+function setSFXEnabled(val) {
+    sfxEnabled = val;
+    if (window.sfx) {
+        for (const key in sfx) {
+            if (sfx[key]) sfx[key].muted = !val;
+        }
+    }
+}
+function setMusicEnabled(val) {
+    musicEnabled = val;
+    if (window.bgMusic) {
+        bgMusic.muted = !val;
+        if (val && bgMusic.paused) bgMusic.play().catch(()=>{});
+        if (!val && !bgMusic.paused) bgMusic.pause();
+    }
+}
+
+sfxToggle.addEventListener('change', e => setSFXEnabled(e.target.checked));
+musicToggle.addEventListener('change', e => setMusicEnabled(e.target.checked));
+resumeBtn.addEventListener('click', () => {
+    hidePauseMenu();
+    resumeGame();
+});
+
+function showPauseMenu() {
+    pauseMenu.style.display = 'flex';
+    setTimeout(() => pauseMenu.style.opacity = '1', 10);
+    sfxToggle.checked = sfxEnabled;
+    musicToggle.checked = musicEnabled;
+    document.body.style.overflow = 'hidden';
+}
+function hidePauseMenu() {
+    pauseMenu.style.opacity = '0';
+    setTimeout(() => pauseMenu.style.display = 'none', 200);
+    document.body.style.overflow = '';
+}
+function pauseGame() {
+    if (!gameState.paused) {
+        gameState.paused = true;
+        showPauseMenu();
+    }
+}
+function resumeGame() {
+    if (gameState.paused) {
+        gameState.paused = false;
+        hidePauseMenu();
+    }
+}
+
+// --- ESC KEY HANDLING ---
+window.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        if (!gameState.paused) {
+            pauseGame();
+        } else {
+            resumeGame();
+        }
+    }
+});
+
+// --- INTEGRATE SFX/MUSIC TOGGLES ---
+// Use sfxEnabled and musicEnabled in your SFX/music play logic:
+// Example for SFX:
+// if (sfx.shoot && sfxEnabled) { sfx.shoot.currentTime = 0; sfx.shoot.play(); }
+// Example for music:
+// if (musicEnabled && bgMusic.paused) bgMusic.play();
 
 // Object Pool for better performance
 class ObjectPool {
@@ -425,8 +570,6 @@ class Player {
                 proj.init(this.x, this.y - this.height/2, 0, -10, '#535353');
             }
         }
-        // Play shoot sound
-        if (sfx.shoot) { try { sfx.shoot.currentTime = 0; sfx.shoot.play(); } catch(e){} }
     }
 
     draw() {
@@ -1197,25 +1340,6 @@ class PowerUp {
     }
 }
 
-// --- AUDIO SETUP ---
-// Place your audio files in an 'assets' folder:
-// assets/shoot.wav, assets/hit.wav, assets/explode.wav, assets/bg-music.mp3
-
-const sfx = {
-    shoot: new Audio('assets/shoot.mp3'),
-    hit: new Audio('assets/hit.mp3'),
-    explode: new Audio('assets/explode.mp3')
-};
-const bgMusic = new Audio('assets/bg-music.mp3');
-bgMusic.loop = true;
-bgMusic.volume = 0.25; // Subtle background music
-
-// Start background music when the game starts (user gesture required in most browsers)
-window.addEventListener('keydown', function startMusicOnce() {
-    bgMusic.play().catch(()=>{});
-    window.removeEventListener('keydown', startMusicOnce);
-});
-
 // Game Objects
 let player;
 let asteroids = [];
@@ -1547,7 +1671,6 @@ function update() {
                 projectilePool.release(proj);
                 if (asteroid.takeDamage(25)) {
                     createExplosion(asteroid.x, asteroid.y, asteroid.getColor(), 30);
-                    if (sfx.explode) { try { sfx.explode.currentTime = 0; sfx.explode.play(); } catch(e){} }
                     gameState.score += asteroid.size * 10;
                     addCameraShake(asteroid.size / 10);
                     
@@ -1705,7 +1828,6 @@ function update() {
                 } else {
                     // Player hit
                     createExplosion(player.x, player.y, '#535353', 40);
-                    if (sfx.explode) { try { sfx.explode.currentTime = 0; sfx.explode.play(); } catch(e){} }
                     gameState.lives--;
                     addCameraShake(5);
                     asteroids.splice(i, 1);
