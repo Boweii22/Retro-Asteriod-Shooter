@@ -1,5 +1,3 @@
-const EXPLOSION_POWER_SCORE = 25000;
-
 let sfxEnabled = true;
 let musicEnabled = true;
 
@@ -91,7 +89,7 @@ let gameState = {
     performanceMode: false,
     screenFlash: 0,
     screenFlashColor: '#ff6600',
-    explosionPowerUses: 1, // Track how many times explosion power has been used (starts at 1 for first unlock)
+    lastExplosionMilestone: 0,
     maxAsteroids: 15, // Limit total asteroids
     maxParticles: 200, // Limit total particles
     maxProjectiles: 50, // Limit total projectiles
@@ -539,11 +537,11 @@ class Player {
 
     triggerExplosionPower() {
         this.explosionPowerAvailable = false;
-        // Increment explosionPowerUses so next unlock is harder
-        gameState.explosionPowerUses = (gameState.explosionPowerUses || 1) + 1;
+        
         // Create massive explosion effect
         createExplosion(this.x, this.y, '#ff6600', 200);
         addCameraShake(25);
+        
         // Destroy ALL asteroids on screen
         for (let i = asteroids.length - 1; i >= 0; i--) {
             const asteroid = asteroids[i];
@@ -551,6 +549,7 @@ class Player {
             gameState.score += asteroid.size * 10;
             asteroids.splice(i, 1);
         }
+        
         gameState.screenFlash = 20;
     }
 
@@ -1898,8 +1897,11 @@ function update() {
         gameState.level++;
         spawnAsteroids();
     }
-    // Grant explosion power only when score >= EXPLOSION_POWER_SCORE * explosionPowerUses
-    if (!player.explosionPowerAvailable && gameState.score >= EXPLOSION_POWER_SCORE * gameState.explosionPowerUses) {
+
+    // Grant explosion power every 7000 points
+    const currentMilestone = Math.floor(gameState.score / 7000) * 7000;
+    if (currentMilestone > gameState.lastExplosionMilestone && !player.explosionPowerAvailable) {
+        gameState.lastExplosionMilestone = currentMilestone;
         player.explosionPowerAvailable = true;
     }
 }
@@ -2084,7 +2086,7 @@ function updateUI() {
                 <b>SPACE</b>: Shoot / Hold for Charge Shot<br>
                 <b>H</b>: Fire Homing Missile<br>
                 <b>SHIFT</b>: Dash (when power-up active)<br>
-                <b>Q</b>: Explosion Power (every ${EXPLOSION_POWER_SCORE.toLocaleString()} score)<br>
+                <b>Q</b>: Explosion Power (every 7000 score)<br>
                 <b>ESC</b>: Pause
             </div>
             <h2 style="color:#111;margin-bottom:0.5em;font-family:sans-serif;">HOW TO PLAY</h2>
@@ -2217,7 +2219,7 @@ function resetGame() {
         performanceMode: false,
         screenFlash: 0,
         screenFlashColor: '#ff6600',
-        explosionPowerUses: 1, // Reset explosion power uses
+        lastExplosionMilestone: 0,
         maxAsteroids: 15,
         maxParticles: 200,
         maxProjectiles: 50,
