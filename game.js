@@ -2466,3 +2466,69 @@ spaceshipImg.src = 'assets/spaceship.png'; // Make sure this path matches your f
     debugDiv.querySelector('#test-hit').onclick = () => { if(sfx.hit) { sfx.hit.currentTime=0; sfx.hit.play(); } };
     debugDiv.querySelector('#test-explode').onclick = () => { if(sfx.explode) { sfx.explode.currentTime=0; sfx.explode.play(); } };
 })();
+
+
+// 1. Console message
+// setTimeout(() => {
+//     if (window.console) {
+//         console.log('%cRetro Asteroid Shooter by Bowei Tombri (2025)\nFind the hidden signature!','color:#fff;background:#222;padding:8px 16px;font-size:1.2em;border-radius:6px;');
+//     }
+// }, 2000);
+
+setTimeout(() => {
+    if (window.console) {
+        console.log('%cbowei-codes','color:#ff6600;font-weight:bold;font-size:1.1em;');
+    }
+}, 2000);
+
+
+(function(){
+    const sig = document.createElement('div');
+    sig.textContent = 'Game by Bowei, 2025. github.com/Boweii22';
+    sig.style.display = 'none';
+    sig.id = 'bowei-signature';
+    document.body.appendChild(sig);
+})();
+
+
+(function(){
+    let modal;
+    window.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'b') {
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.style.position = 'fixed';
+                modal.style.top = '0';
+                modal.style.left = '0';
+                modal.style.width = '100vw';
+                modal.style.height = '100vh';
+                modal.style.background = 'rgba(0,0,0,0.85)';
+                modal.style.display = 'flex';
+                modal.style.justifyContent = 'center';
+                modal.style.alignItems = 'center';
+                modal.style.zIndex = '9999';
+                modal.innerHTML = `<div style="background:#fff;padding:32px 48px;border-radius:16px;box-shadow:0 4px 24px #0008;text-align:center;font-size:1.3em;font-family:sans-serif;max-width:90vw;">
+                    <b>👾 Retro Asteroid Shooter</b><br><br>
+                    <span style='color:#222;'>Created by <b>Bowei Tombri</b> (2025)<br>github.com/Boweii22</span><br><br>
+                    <button id='close-bowei-modal' style='margin-top:1em;padding:0.5em 2em;font-size:1em;background:#222;color:#fff;border:none;border-radius:8px;cursor:pointer;'>Close</button>
+                </div>`;
+                document.body.appendChild(modal);
+                modal.querySelector('#close-bowei-modal').onclick = () => { modal.remove(); modal = null; };
+            }
+        }
+    });
+})();
+
+// 4. Encoded in game data
+const _boweiSignature = {
+    author: 'Bowei',
+    year: 2025,
+    repo: 'github.com/Boweii22',
+    proof: 'Game by Bowei (2025) | github.com/Boweii22'
+};
+
+// 5. Code comment signature
+// --- Game by Bowei (2025) | github.com/Boweii22 ---
+
+// Author signature hash (SHA-256):
+// 64918d98c05a0bdedb13c454b5091c65ce788be153a58688819368dd38ce64ba
